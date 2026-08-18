@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meme Sentiment Classification</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="bg-blob blob-1"></div>
+<div class="bg-blob blob-2"></div>
+
+<div class="container">
+
+  <header>
+    <h1>Meme Sentiment <span class="accent">Classification</span></h1>
+    <p class="tagline">Upload a meme image and the model predicts whether it is
+      <b class="pos">positive</b>, <b class="neu">neutral</b> or <b class="neg">negative</b>.</p>
+  </header>
+
+  <main class="card">
+
+    <form id="predictForm">
+      <label id="dropZone" for="image">
+        <div id="dropInner">
+          <div class="drop-title">Drag &amp; drop a meme here</div>
+          <div class="drop-sub">or click to browse — JPG, PNG, GIF</div>
+        </div>
+        <img id="previewImg" alt="" hidden>
+        <input id="image" name="image" type="file" accept="image/*" required hidden>
+      </label>
+
+      <button id="predictBtn" type="submit" disabled>
+        <span id="btnText">Predict Sentiment</span>
+        <span id="spinner" class="spinner" hidden></span>
+      </button>
+    </form>
+
+    <section id="result" hidden>
+      <div id="verdict" class="verdict">
+        <div>
+          <div id="verdictLabel" class="verdict-label"></div>
+          <div id="verdictConf" class="verdict-conf"></div>
+        </div>
+      </div>
+
+      <div class="bars">
+        <div class="bar-row" data-cls="positive">
+          <span class="bar-name">Positive</span>
+          <div class="bar-track"><div class="bar-fill fill-pos"></div></div>
+          <span class="bar-val">0%</span>
+        </div>
+        <div class="bar-row" data-cls="neutral">
+          <span class="bar-name">Neutral</span>
+          <div class="bar-track"><div class="bar-fill fill-neu"></div></div>
+          <span class="bar-val">0%</span>
+        </div>
+        <div class="bar-row" data-cls="negative">
+          <span class="bar-name">Negative</span>
+          <div class="bar-track"><div class="bar-fill fill-neg"></div></div>
+          <span class="bar-val">0%</span>
+        </div>
+      </div>
+
+      <button id="resetBtn" type="button" class="ghost">Try another meme</button>
+    </section>
+
+    <div id="error" class="error" hidden></div>
+
+  </main>
+
+</div>
+
+<script>
+const form       = document.getElementById("predictForm");
+const dropZone   = document.getElementById("dropZone");
+const dropInner  = document.getElementById("dropInner");
+const input      = document.getElementById("image");
+const previewImg = document.getElementById("previewImg");
+const btn        = document.getElementById("predictBtn");
+const btnText    = document.getElementById("btnText");
+const spinner    = document.getElementById("spinner");
+const resultBox  = document.getElementById("result");
+const errorBox   = document.getElementById("error");
+
+function showPreview(file) {
+  if (!file || !file.type.startsWith("image/")) return;
+  previewImg.src = URL.createObjectURL(file);
+  previewImg.hidden = false;
+  dropInner.hidden = true;
+  btn.disabled = false;
+  resultBox.hidden = true;
+  errorBox.hidden = true;
+}
+
+input.addEventListener("change", () => showPreview(input.files[0]));
+
+["dragenter", "dragover"].forEach(ev =>
+  dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.add("dragging"); }));
+["dragleave", "drop"].forEach(ev =>
+  dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.remove("dragging"); }));
+dropZone.addEventListener("drop", e => {
+  if (e.dataTransfer.files.length) {
+    input.files = e.dataTransfer.files;
+    showPreview(input.files[0]);
+  }
+});
+
+form.addEventListener("submit", async e => {
+  e.preventDefault();
+  btn.disabled = true;
+  btnText.textContent = "Analyzing…";
+  spinner.hidden = false;
+  errorBox.hidden = true;
+
+  try {
+    const response = await fetch("/predict", { method: "POST", body: new FormData(form) });
+    const data = await response.json();
+
+    if (data.error) throw new Error(data.error);
+
+    document.getElementById("verdictLabel").textContent = data.sentiment.toUpperCase();
+    document.getElementById("verdictLabel").className = "verdict-label text-" + data.sentiment;
+    document.getElementById("verdictConf").textContent = data.confidence + "% confidence";
+
+    resultBox.hidden = false;
+    document.querySelectorAll(".bar-row").forEach(row => {
+      const cls = row.dataset.cls;
+      const val = data.probabilities[cls] ?? 0;
+      row.querySelector(".bar-val").textContent = val + "%";
+      const fill = row.querySelector(".bar-fill");
+      fill.style.width = "0%";
+      requestAnimationFrame(() => requestAnimationFrame(() => fill.style.width = val + "%"));
+    });
+    resultBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } catch (err) {
+    errorBox.textContent = err.message;
+    errorBox.hidden = false;
+  } finally {
+    btn.disabled = false;
+    btnText.textContent = "Predict Sentiment";
+    spinner.hidden = true;
+  }
+});
+
+document.getElementById("resetBtn").addEventListener("click", () => {
+  form.reset();
+  previewImg.hidden = true;
+  dropInner.hidden = false;
+  resultBox.hidden = true;
+  btn.disabled = true;
+});
+</script>
+</body>
+</html>

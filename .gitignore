@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Dataset (download from Kaggle, ~700 MB — not stored in git)
+data/memes/
+
+# Trained model weights (25 MB — regenerate with src/train.py)
+models/*.keras
+
+# User uploads from the web app
+uploads/*
+!uploads/.gitkeep
+
+# macOS
+.DS_Store
